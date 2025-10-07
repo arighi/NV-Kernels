@@ -141,4 +141,6 @@ extern const struct tegra_fuse_soc tegra234_fuse_soc;
 extern const struct tegra_fuse_soc tegra241_fuse_soc;
 #endif
 
+extern const struct tegra_fuse_soc tegra410_fuse_soc;
+
 #endif

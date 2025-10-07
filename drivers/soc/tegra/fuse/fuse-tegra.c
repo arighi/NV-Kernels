@@ -61,6 +61,7 @@ static const struct of_device_id car_match[] __initconst = {
 };
 
 static struct tegra_fuse *fuse = &(struct tegra_fuse) {
+	.dev = NULL,
 	.base = NULL,
 	.soc = NULL,
 };
@@ -127,80 +128,141 @@ static void tegra_fuse_print_sku_info(struct tegra_sku_info *tegra_sku_info)
 
 static int tegra_fuse_add_lookups(struct tegra_fuse *fuse)
 {
+	unsigned int i = 0;
+
 	fuse->lookups = kmemdup_array(fuse->soc->lookups, fuse->soc->num_lookups,
 				      sizeof(*fuse->lookups), GFP_KERNEL);
 	if (!fuse->lookups)
 		return -ENOMEM;
+
+	/* Initialize the nvmem_name for the lookups */
+	for (i = 0; i < fuse->soc->num_lookups; i++) {
+		fuse->lookups[i].nvmem_name = nvmem_dev_name(fuse->nvmem);
+		pr_info("adding lookup %s for %s\n", fuse->lookups[i].cell_name, fuse->lookups[i].nvmem_name);
+	}
 
 	nvmem_add_cell_lookups(fuse->lookups, fuse->soc->num_lookups);
 
 	return 0;
 }
 
+static int tegra_fuse_get_soc_data_from_chipid(struct tegra_fuse *fuse)
+{
+	int ret = 0;
+	u8 chip;
+
+	chip = tegra_get_chip_id();
+	switch (chip) {
+#if defined(CONFIG_ARCH_TEGRA_194_SOC)
+	case TEGRA194:
+		fuse->soc = &tegra194_fuse_soc;
+		break;
+#endif
+#if defined(CONFIG_ARCH_TEGRA_234_SOC)
+	case TEGRA234:
+		fuse->soc = &tegra234_fuse_soc;
+		break;
+#endif
+#if defined(CONFIG_ARCH_TEGRA_241_SOC)
+	case TEGRA241:
+		fuse->soc = &tegra241_fuse_soc;
+		break;
+#endif
+	case TEGRA410:
+		fuse->soc = &tegra410_fuse_soc;
+		break;
+	default:
+		ret = -EINVAL;
+		dev_err(fuse->dev, "Unsupported SoC: %02x\n", chip);
+	}
+
+	return ret;
+}
+
+static int tegra_fuse_get_id(struct device *dev)
+{
+	if (is_acpi_node(dev_fwnode(dev))) {
+		u64 uid;
+
+		if (acpi_dev_uid_to_integer(ACPI_COMPANION(dev), &uid))
+			return 0;
+
+		return (int)uid;
+	} else {
+		int id;
+
+		id = of_alias_get_id(dev->of_node, "efuse");
+		if (id < 0)
+			return 0;
+
+		return id;
+	}
+}
+
 static int tegra_fuse_probe(struct platform_device *pdev)
 {
-	void __iomem *base = fuse->base;
+	struct tegra_fuse *efuse;
 	struct nvmem_config nvmem;
 	struct resource *res;
 	int err;
+	int id;
 
-	err = devm_add_action(&pdev->dev, tegra_fuse_restore, (void __force *)base);
-	if (err)
-		return err;
+	id = tegra_fuse_get_id(&pdev->dev);
 
-	/* take over the memory region from the early initialization */
-	fuse->base = devm_platform_get_and_ioremap_resource(pdev, 0, &res);
-	if (IS_ERR(fuse->base))
-		return PTR_ERR(fuse->base);
-	fuse->phys = res->start;
+	if (!id) {
+		void __iomem *base = fuse->base;
+		efuse = fuse;
 
-	/* Initialize the soc data and lookups if using ACPI boot. */
-	if (is_acpi_node(dev_fwnode(&pdev->dev)) && !fuse->soc) {
-		u8 chip;
+		/* Check if the default fuse device is already initialized */
+		if (efuse->dev)
+			return dev_err_probe(&pdev->dev, -EINVAL, "default fuse device already initialized\n");
 
-		tegra_acpi_init_apbmisc();
-
-		chip = tegra_get_chip_id();
-		switch (chip) {
-#if defined(CONFIG_ARCH_TEGRA_194_SOC)
-		case TEGRA194:
-			fuse->soc = &tegra194_fuse_soc;
-			break;
-#endif
-#if defined(CONFIG_ARCH_TEGRA_234_SOC)
-		case TEGRA234:
-			fuse->soc = &tegra234_fuse_soc;
-			break;
-#endif
-#if defined(CONFIG_ARCH_TEGRA_241_SOC)
-		case TEGRA241:
-			fuse->soc = &tegra241_fuse_soc;
-			break;
-#endif
-		default:
-			return dev_err_probe(&pdev->dev, -EINVAL, "Unsupported SoC: %02x\n", chip);
-		}
-
-		fuse->soc->init(fuse);
-
-		err = tegra_fuse_add_lookups(fuse);
+		efuse->dev = &pdev->dev;
+		err = devm_add_action(&pdev->dev, tegra_fuse_restore, (void __force *)base);
 		if (err)
-			return dev_err_probe(&pdev->dev, err, "failed to add FUSE lookups\n");
+			return err;
+
+		/* release the early I/O memory mapping */
+		iounmap(base);
+
+		dev_info(&pdev->dev, "using as default fuse device\n");
+	} else {
+		efuse = devm_kzalloc(&pdev->dev, sizeof(*efuse), GFP_KERNEL);
+		if (!efuse)
+			return -ENOMEM;
+
+		efuse->dev = &pdev->dev;
 	}
 
-	fuse->clk = devm_clk_get_optional(&pdev->dev, "fuse");
-	if (IS_ERR(fuse->clk))
-		return dev_err_probe(&pdev->dev, PTR_ERR(fuse->clk), "failed to get FUSE clock\n");
+	/* take over the memory region from the early initialization */
+	efuse->base = devm_platform_get_and_ioremap_resource(pdev, 0, &res);
+	if (IS_ERR(efuse->base))
+		return PTR_ERR(efuse->base);
+	efuse->phys = res->start;
 
-	platform_set_drvdata(pdev, fuse);
-	fuse->dev = &pdev->dev;
+	/* Initialize the soc data and lookups if using ACPI boot. */
+	if (is_acpi_node(dev_fwnode(&pdev->dev))) {
+		tegra_acpi_init_apbmisc();
+
+		err = tegra_fuse_get_soc_data_from_chipid(efuse);
+		if (err)
+			return dev_err_probe(&pdev->dev, err, "failed to get SoC data\n");
+
+		efuse->soc->init(efuse);
+	}
+
+	efuse->clk = devm_clk_get_optional(&pdev->dev, "fuse");
+	if (IS_ERR(efuse->clk))
+		return dev_err_probe(&pdev->dev, PTR_ERR(efuse->clk), "failed to get FUSE clock\n");
+
+	platform_set_drvdata(pdev, efuse);
 
 	err = devm_pm_runtime_enable(&pdev->dev);
 	if (err)
 		return err;
 
-	if (fuse->soc->probe) {
-		err = fuse->soc->probe(fuse);
+	if (efuse->soc->probe) {
+		err = efuse->soc->probe(efuse);
 		if (err < 0)
 			return err;
 	}
@@ -208,32 +270,36 @@ static int tegra_fuse_probe(struct platform_device *pdev)
 	memset(&nvmem, 0, sizeof(nvmem));
 	nvmem.dev = &pdev->dev;
 	nvmem.name = "fuse";
-	nvmem.id = -1;
+	nvmem.id = id;
 	nvmem.owner = THIS_MODULE;
-	nvmem.cells = fuse->soc->cells;
-	nvmem.ncells = fuse->soc->num_cells;
-	nvmem.keepout = fuse->soc->keepouts;
-	nvmem.nkeepout = fuse->soc->num_keepouts;
+	nvmem.cells = efuse->soc->cells;
+	nvmem.ncells = efuse->soc->num_cells;
+	nvmem.keepout = efuse->soc->keepouts;
+	nvmem.nkeepout = efuse->soc->num_keepouts;
 	nvmem.type = NVMEM_TYPE_OTP;
 	nvmem.read_only = true;
 	nvmem.root_only = false;
 	nvmem.reg_read = tegra_fuse_read;
-	nvmem.size = fuse->soc->info->size;
+	nvmem.size = efuse->soc->info->size;
 	nvmem.word_size = 4;
 	nvmem.stride = 4;
-	nvmem.priv = fuse;
+	nvmem.priv = efuse;
 
-	fuse->nvmem = devm_nvmem_register(&pdev->dev, &nvmem);
-	if (IS_ERR(fuse->nvmem)) {
-		err = PTR_ERR(fuse->nvmem);
+	efuse->nvmem = devm_nvmem_register(&pdev->dev, &nvmem);
+	if (IS_ERR(efuse->nvmem)) {
+		err = PTR_ERR(efuse->nvmem);
 		dev_err(&pdev->dev, "failed to register NVMEM device: %d\n",
 			err);
 		return err;
 	}
 
-	fuse->rst = devm_reset_control_get_optional(&pdev->dev, "fuse");
-	if (IS_ERR(fuse->rst))
-		return dev_err_probe(&pdev->dev, PTR_ERR(fuse->rst), "failed to get FUSE reset\n");
+	err = tegra_fuse_add_lookups(efuse);
+	if (err)
+		return dev_err_probe(&pdev->dev, err, "failed to add FUSE lookups\n");
+
+	efuse->rst = devm_reset_control_get_optional(&pdev->dev, "fuse");
+	if (IS_ERR(efuse->rst))
+		return dev_err_probe(&pdev->dev, PTR_ERR(efuse->rst), "failed to get FUSE reset\n");
 
 	/*
 	 * FUSE clock is enabled at a boot time, hence this resume/suspend
@@ -243,7 +309,7 @@ static int tegra_fuse_probe(struct platform_device *pdev)
 	if (err)
 		return err;
 
-	err = reset_control_reset(fuse->rst);
+	err = reset_control_reset(efuse->rst);
 	pm_runtime_put(&pdev->dev);
 
 	if (err < 0) {
@@ -251,14 +317,12 @@ static int tegra_fuse_probe(struct platform_device *pdev)
 		return err;
 	}
 
-	/* release the early I/O memory mapping */
-	iounmap(base);
-
 	return 0;
 }
 
 static int __maybe_unused tegra_fuse_runtime_resume(struct device *dev)
 {
+	struct tegra_fuse *fuse = dev_get_drvdata(dev);
 	int err;
 
 	err = clk_prepare_enable(fuse->clk);
@@ -272,6 +336,7 @@ static int __maybe_unused tegra_fuse_runtime_resume(struct device *dev)
 
 static int __maybe_unused tegra_fuse_runtime_suspend(struct device *dev)
 {
+	struct tegra_fuse *fuse = dev_get_drvdata(dev);
 	clk_disable_unprepare(fuse->clk);
 
 	return 0;
@@ -279,6 +344,7 @@ static int __maybe_unused tegra_fuse_runtime_suspend(struct device *dev)
 
 static int __maybe_unused tegra_fuse_suspend(struct device *dev)
 {
+	struct tegra_fuse *fuse = dev_get_drvdata(dev);
 	int ret;
 
 	/*
@@ -295,6 +361,7 @@ static int __maybe_unused tegra_fuse_suspend(struct device *dev)
 
 static int __maybe_unused tegra_fuse_resume(struct device *dev)
 {
+	struct tegra_fuse *fuse = dev_get_drvdata(dev);
 	int ret = 0;
 
 	if (fuse->soc->clk_suspend_on)
@@ -312,7 +379,10 @@ static const struct dev_pm_ops tegra_fuse_pm = {
 };
 
 static const struct acpi_device_id tegra_fuse_acpi_match[] = {
-	{ "NVDA200F" },
+	{ .id = "NVDA200F", },
+	{ .id = "NVDA300F", },
+	{ .id = "NVDA400F", },
+	{ .id = "NVDA500F", },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(acpi, tegra_fuse_acpi_match);
@@ -477,6 +547,11 @@ static int __init tegra_init_fuse(void)
 
 	tegra_init_apbmisc();
 
+	/*
+	 * TODO: Add support to handle multiple device-tree nodes in DT boot.
+	 * ACPI does not use this code.
+	 */
+
 	np = of_find_matching_node_and_match(NULL, tegra_fuse_match, &match);
 	if (!np) {
 		/*
@@ -563,12 +638,6 @@ static int __init tegra_init_fuse(void)
 	}
 
 	fuse->soc->init(fuse);
-
-	tegra_fuse_print_sku_info(&tegra_sku_info);
-
-	err = tegra_fuse_add_lookups(fuse);
-	if (err)
-		pr_err("failed to add FUSE lookups\n");
 
 	return err;
 }

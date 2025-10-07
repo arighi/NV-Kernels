@@ -826,3 +826,164 @@ const struct tegra_fuse_soc tegra241_fuse_soc = {
 	.soc_attr_group = &tegra194_soc_attr_group,
 };
 #endif
+
+static const struct tegra_fuse_info tegra410_fuse_info = {
+	.read = tegra30_fuse_read,
+	.size = 0x16008,
+	.spare = 0xcf0,
+};
+
+static const struct nvmem_keepout tegra410_fuse_keepouts[] = {
+	{ .start = 0xc, .end = 0x1600c }
+};
+
+static const struct nvmem_cell_info tegra410_fuse_cells[] = {
+	{
+		.name = "sn-opt-hwpm-disable",
+		.offset = 0x240,
+		.bytes = 4,
+		.bit_offset = 0,
+		.nbits = 32,
+	}, {
+		.name = "sn-fa",
+		.offset = 0x104,
+		.bytes = 4,
+		.bit_offset = 0,
+		.nbits = 32,
+	}, {
+		.name = "sn-multi-rma-en",
+		.offset = 0x108,
+		.bytes = 4,
+		.bit_offset = 0,
+		.nbits = 32,
+	}, {
+		.name = "sn-rma-en",
+		.offset = 0x109c,
+		.bytes = 4,
+		.bit_offset = 0,
+		.nbits = 32,
+	}, {
+		.name = "cm-opt-hwpm-disable",
+		.offset = 0x17c,
+		.bytes = 4,
+		.bit_offset = 0,
+		.nbits = 32,
+	}, {
+		.name = "cm-fa",
+		.offset = 0x104,
+		.bytes = 4,
+		.bit_offset = 0,
+		.nbits = 32,
+	}, {
+		.name = "cm-rma-en",
+		.offset = 0x1f70,
+		.bytes = 4,
+		.bit_offset = 0,
+		.nbits = 32,
+	}, {
+		.name = "cm-multi-rma-en",
+		.offset = 0x108,
+		.bytes = 4,
+		.bit_offset = 0,
+		.nbits = 32,
+	}, {
+		.name = "memio128-opt-hwpm-disable",
+		.offset = 0x17c,
+		.bytes = 4,
+		.bit_offset = 0,
+		.nbits = 32,
+	}, {
+		.name = "memio128-fa",
+		.offset = 0x104,
+		.bytes = 4,
+		.bit_offset = 0,
+		.nbits = 32,
+	}, {
+		.name = "memio128-multi-rma-en",
+		.offset = 0x108,
+		.bytes = 4,
+		.bit_offset = 0,
+		.nbits = 32,
+	}, {
+		.name = "memio128-rma-en",
+		.offset = 0x0d40,
+		.bytes = 4,
+		.bit_offset = 0,
+		.nbits = 32,
+	},
+};
+
+static const struct nvmem_cell_lookup tegra410_fuse_lookups[] = {
+	{
+		.nvmem_name = "fuse",
+		.cell_name = "sn-opt-hwpm-disable",
+		.dev_id = "hwpm",
+		.con_id = "sn-opt-hwpm-disable",
+	}, {
+		.nvmem_name = "fuse",
+		.cell_name = "sn-fa",
+		.dev_id = "hwpm",
+		.con_id = "sn-fa",
+	}, {
+		.nvmem_name = "fuse",
+		.cell_name = "sn-multi-rma-en",
+		.dev_id = "hwpm",
+		.con_id = "sn-multi-rma-en",
+	}, {
+		.nvmem_name = "fuse",
+		.cell_name = "sn-rma-en",
+		.dev_id = "hwpm",
+		.con_id = "sn-rma-en",
+	}, {
+		.nvmem_name = "fuse",
+		.cell_name = "cm-opt-hwpm-disable",
+		.dev_id = "hwpm",
+		.con_id = "cm-opt-hwpm-disable",
+	}, {
+		.nvmem_name = "fuse",
+		.cell_name = "cm-fa",
+		.dev_id = "hwpm",
+		.con_id = "cm-fa",
+	}, {
+		.nvmem_name = "fuse",
+		.cell_name = "cm-rma-en",
+		.dev_id = "hwpm",
+		.con_id = "cm-rma-en",
+	}, {
+		.nvmem_name = "fuse",
+		.cell_name = "cm-multi-rma-en",
+		.dev_id = "hwpm",
+		.con_id = "cm-multi-rma-en",
+	}, {
+		.nvmem_name = "fuse",
+		.cell_name = "memio128-opt-hwpm-disable",
+		.dev_id = "hwpm",
+		.con_id = "memio128-opt-hwpm-disable",
+	}, {
+		.nvmem_name = "fuse",
+		.cell_name = "memio128-fa",
+		.dev_id = "hwpm",
+		.con_id = "memio128-fa",
+	}, {
+		.nvmem_name = "fuse",
+		.cell_name = "memio128-multi-rma-en",
+		.dev_id = "hwpm",
+		.con_id = "memio128-multi-rma-en",
+	}, {
+		.nvmem_name = "fuse",
+		.cell_name = "memio128-rma-en",
+		.dev_id = "hwpm",
+		.con_id = "memio128-rma-en",
+	},
+};
+
+const struct tegra_fuse_soc tegra410_fuse_soc = {
+	.init = tegra30_fuse_init,
+	.info = &tegra410_fuse_info,
+	.keepouts = tegra410_fuse_keepouts,
+	.num_keepouts = ARRAY_SIZE(tegra410_fuse_keepouts),
+	.lookups = tegra410_fuse_lookups,
+	.num_lookups = ARRAY_SIZE(tegra410_fuse_lookups),
+	.cells = tegra410_fuse_cells,
+	.num_cells = ARRAY_SIZE(tegra410_fuse_cells),
+};

@@ -17,7 +17,8 @@
 
 #include "fuse.h"
 
-#define FUSE_SKU_INFO	0x10
+#define FUSE_SKU_INFO		0x10
+#define TEGRA410_FUSE_SKU_INFO	0x300
 
 #define ERD_ERR_CONFIG 0x120c
 #define ERD_MASK_INBAND_ERR 0x1
@@ -167,6 +168,10 @@ void __init tegra_init_revision(void)
 {
 	u8 chip_id, minor_rev;
 
+	/* Avoid re-initialization if revision is already set. */
+	if (tegra_sku_info.revision != TEGRA_REVISION_UNKNOWN)
+		return;
+
 	chip_id = tegra_get_chip_id();
 	minor_rev = tegra_get_minor_rev();
 
@@ -191,7 +196,14 @@ void __init tegra_init_revision(void)
 		tegra_sku_info.revision = TEGRA_REVISION_UNKNOWN;
 	}
 
-	tegra_sku_info.sku_id = tegra_fuse_read_early(FUSE_SKU_INFO);
+	switch (chip_id) {
+	case TEGRA410:
+		tegra_sku_info.sku_id = tegra_fuse_read_early(TEGRA410_FUSE_SKU_INFO);
+		break;
+	default:
+		tegra_sku_info.sku_id = tegra_fuse_read_early(FUSE_SKU_INFO);
+	}
+
 	tegra_sku_info.platform = tegra_get_platform();
 }
 
