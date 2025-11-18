@@ -113,6 +113,8 @@ const struct tegra_fuse_soc tegra30_fuse_soc = {
 	.info = &tegra30_fuse_info,
 	.soc_attr_group = &tegra_soc_attr_group,
 	.clk_suspend_on = false,
+	.nvmem_name = "fuse",
+	.nvmem_id = -1,
 };
 #endif
 
@@ -251,6 +253,8 @@ const struct tegra_fuse_soc tegra114_fuse_soc = {
 	.num_cells = ARRAY_SIZE(tegra114_fuse_cells),
 	.soc_attr_group = &tegra_soc_attr_group,
 	.clk_suspend_on = false,
+	.nvmem_name = "fuse",
+	.nvmem_id = -1,
 };
 #endif
 
@@ -411,6 +415,8 @@ const struct tegra_fuse_soc tegra124_fuse_soc = {
 	.num_cells = ARRAY_SIZE(tegra124_fuse_cells),
 	.soc_attr_group = &tegra_soc_attr_group,
 	.clk_suspend_on = true,
+	.nvmem_name = "fuse",
+	.nvmem_id = -1,
 };
 #endif
 
@@ -582,6 +588,8 @@ const struct tegra_fuse_soc tegra210_fuse_soc = {
 	.num_lookups = ARRAY_SIZE(tegra210_fuse_lookups),
 	.soc_attr_group = &tegra_soc_attr_group,
 	.clk_suspend_on = false,
+	.nvmem_name = "fuse",
+	.nvmem_id = -1,
 };
 #endif
 
@@ -641,6 +649,8 @@ const struct tegra_fuse_soc tegra186_fuse_soc = {
 	.num_keepouts = ARRAY_SIZE(tegra186_fuse_keepouts),
 	.soc_attr_group = &tegra_soc_attr_group,
 	.clk_suspend_on = false,
+	.nvmem_name = "fuse",
+	.nvmem_id = -1,
 };
 #endif
 
@@ -734,6 +744,8 @@ const struct tegra_fuse_soc tegra194_fuse_soc = {
 	.num_keepouts = ARRAY_SIZE(tegra194_fuse_keepouts),
 	.soc_attr_group = &tegra194_soc_attr_group,
 	.clk_suspend_on = false,
+	.nvmem_name = "fuse",
+	.nvmem_id = -1,
 };
 #endif
 
@@ -804,6 +816,8 @@ const struct tegra_fuse_soc tegra234_fuse_soc = {
 	.num_keepouts = ARRAY_SIZE(tegra234_fuse_keepouts),
 	.soc_attr_group = &tegra194_soc_attr_group,
 	.clk_suspend_on = false,
+	.nvmem_name = "fuse",
+	.nvmem_id = -1,
 };
 #endif
 
@@ -824,6 +838,8 @@ const struct tegra_fuse_soc tegra241_fuse_soc = {
 	.keepouts = tegra241_fuse_keepouts,
 	.num_keepouts = ARRAY_SIZE(tegra241_fuse_keepouts),
 	.soc_attr_group = &tegra194_soc_attr_group,
+	.nvmem_name = "fuse",
+	.nvmem_id = -1,
 };
 #endif
 
@@ -986,4 +1002,6 @@ const struct tegra_fuse_soc tegra410_fuse_soc = {
 	.num_lookups = ARRAY_SIZE(tegra410_fuse_lookups),
 	.cells = tegra410_fuse_cells,
 	.num_cells = ARRAY_SIZE(tegra410_fuse_cells),
+	.nvmem_name = "fuse",
+	.nvmem_id = -1,
 };

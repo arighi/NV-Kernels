@@ -40,6 +40,9 @@ struct tegra_fuse_soc {
 	const struct attribute_group *soc_attr_group;
 
 	bool clk_suspend_on;
+
+	const char *nvmem_name;
+	int nvmem_id;
 };
 
 struct tegra_fuse {

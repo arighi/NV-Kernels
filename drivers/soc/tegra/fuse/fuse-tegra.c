@@ -269,8 +269,8 @@ static int tegra_fuse_probe(struct platform_device *pdev)
 
 	memset(&nvmem, 0, sizeof(nvmem));
 	nvmem.dev = &pdev->dev;
-	nvmem.name = "fuse";
-	nvmem.id = id;
+	nvmem.name = efuse->soc->nvmem_name;
+	nvmem.id = efuse->soc->nvmem_id;
 	nvmem.owner = THIS_MODULE;
 	nvmem.cells = efuse->soc->cells;
 	nvmem.ncells = efuse->soc->num_cells;
