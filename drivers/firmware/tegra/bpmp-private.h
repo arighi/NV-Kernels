@@ -21,6 +21,7 @@ struct tegra_bpmp_ops {
 	int (*post_request)(struct tegra_bpmp_channel *channel);
 	int (*ring_doorbell)(struct tegra_bpmp *bpmp);
 	int (*resume)(struct tegra_bpmp *bpmp);
+	int (*transfer)(struct tegra_bpmp *bpmp, struct tegra_bpmp_message *msg);
 };
 
 extern const struct tegra_bpmp_ops tegra186_bpmp_ops;

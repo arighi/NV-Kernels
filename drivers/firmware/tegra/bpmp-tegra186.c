@@ -384,4 +384,5 @@ const struct tegra_bpmp_ops tegra186_bpmp_ops = {
 	.post_request = tegra186_bpmp_post_message,
 	.ring_doorbell = tegra186_bpmp_ring_doorbell,
 	.resume = tegra186_bpmp_resume,
+	.transfer = tegra_bpmp_transfer_channel,
 };
