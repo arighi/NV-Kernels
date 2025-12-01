@@ -411,24 +411,29 @@ u32 __init tegra_fuse_read_early(unsigned int offset)
 	return fuse->read_early(fuse, offset);
 }
 
+static int tegra_fuse_match_nvmem(struct device *dev, const void *data)
+{
+	if (strcmp(dev_name(dev), "fuse") == 0)
+		return 1;
+
+	return 0;
+}
+
 int tegra_fuse_readl(unsigned long offset, u32 *value)
 {
-	if (!fuse->dev)
+	struct nvmem_device *nvmem;
+	int err;
+
+	/* Find the default nvmem efuse device. */
+	nvmem = nvmem_device_find(NULL, tegra_fuse_match_nvmem);
+	if (IS_ERR_OR_NULL(nvmem))
 		return -EPROBE_DEFER;
 
-	/*
-	 * Wait for fuse->clk to be initialized if device-tree boot is used.
-	 */
-	if (is_of_node(dev_fwnode(fuse->dev)) && !fuse->clk)
-		return -EPROBE_DEFER;
+	err = nvmem_device_read(nvmem, offset, sizeof(u32), value);
+	nvmem_device_put(nvmem);
 
-	if (!fuse->read)
-		return -EPROBE_DEFER;
-
-	if (IS_ERR(fuse->clk))
-		return PTR_ERR(fuse->clk);
-
-	*value = fuse->read(fuse, offset);
+	if (err < 0)
+		return err;
 
 	return 0;
 }
