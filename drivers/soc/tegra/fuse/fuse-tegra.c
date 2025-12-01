@@ -579,6 +579,8 @@ static int __init tegra_init_fuse(void)
 
 	early_fuse->soc->init(early_fuse);
 
+	tegra_init_revision();
+
 	return err;
 }
 early_initcall(tegra_init_fuse);
