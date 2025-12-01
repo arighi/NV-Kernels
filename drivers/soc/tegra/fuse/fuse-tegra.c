@@ -581,6 +581,9 @@ static int __init tegra_init_fuse(void)
 
 	tegra_init_revision();
 
+	if (early_fuse->soc->speedo_init)
+		early_fuse->soc->speedo_init(&tegra_sku_info);
+
 	return err;
 }
 early_initcall(tegra_init_fuse);

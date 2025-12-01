@@ -91,9 +91,6 @@ static void __init tegra30_fuse_init(struct tegra_fuse *fuse)
 	fuse->read_early = tegra30_fuse_read_early;
 	fuse->read = tegra30_fuse_read;
 
-	if (fuse->soc->speedo_init)
-		fuse->soc->speedo_init(&tegra_sku_info);
-
 	tegra30_fuse_add_randomness();
 }
 #endif
