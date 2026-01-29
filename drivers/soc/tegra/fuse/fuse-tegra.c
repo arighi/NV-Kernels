@@ -440,6 +440,7 @@ const struct attribute_group tegra194_soc_attr_group = {
 struct device *tegra_soc_device_register(void)
 {
 	struct soc_device_attribute *attr;
+	u8 chipid = tegra_get_chip_id();
 	struct soc_device *dev;
 
 	attr = kzalloc(sizeof(*attr), GFP_KERNEL);
@@ -449,11 +450,11 @@ struct device *tegra_soc_device_register(void)
 	attr->family = kasprintf(GFP_KERNEL, "Tegra");
 	if (tegra_is_silicon())
 		attr->revision = kasprintf(GFP_KERNEL, "%s %s",
-					   tegra_soc_platform_name[tegra_sku_info.platform],
-					   tegra_soc_revision_name[tegra_sku_info.revision]);
+					   tegra_platform_name[tegra_sku_info.platform],
+					   tegra_revision_name[tegra_sku_info.revision]);
 	else
 		attr->revision = kasprintf(GFP_KERNEL, "%s",
-					   tegra_soc_platform_name[tegra_sku_info.platform]);
+					   tegra_platform_name[tegra_sku_info.platform]);
 	attr->soc_id = kasprintf(GFP_KERNEL, "%u", chipid);
 
 	switch (chipid) {
