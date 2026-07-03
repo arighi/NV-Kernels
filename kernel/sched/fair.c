@@ -7439,6 +7439,66 @@ static inline bool test_idle_cores(int cpu)
 }
 
 /*
+ * Return true when @cpu has a higher asymmetric-packing priority than
+ * @other in their SMT scheduling domain.
+ */
+static bool sched_smt_asym_prefer(int cpu, int other)
+{
+	struct sched_domain *sd;
+
+	for_each_domain(cpu, sd) {
+		if (!(sd->flags & SD_SHARE_CPUCAPACITY))
+			break;
+
+		if ((sd->flags & SD_ASYM_PACKING) &&
+		    cpumask_test_cpu(other, sched_domain_span(sd)))
+			return sched_asym_prefer(cpu, other);
+	}
+
+	return false;
+}
+
+/*
+ * Return the highest-priority CPU in @cpu's SMT core that is also in @cpus.
+ * Callers must ensure the core is fully idle.
+ */
+static int __select_idle_core_cpu(int cpu, const struct cpumask *cpus)
+{
+	int best = cpu;
+	int sibling;
+
+	for_each_cpu_and(sibling, cpu_smt_mask(cpu), cpus) {
+		if (sched_smt_asym_prefer(sibling, best))
+			best = sibling;
+	}
+
+	return best;
+}
+
+static __always_inline int
+select_idle_core_cpu(int cpu, const struct cpumask *cpus)
+{
+	if (!sched_smt_asym_active() || !sched_feat(SMT_ASYM_PACKING))
+		return cpu;
+
+	return __select_idle_core_cpu(cpu, cpus);
+}
+
+/*
+ * Redirect an idle SMT CPU to a higher-priority sibling when the whole core
+ * is idle. Keep partially-idle cores and symmetric SMT systems unchanged.
+ */
+static __always_inline int
+select_idle_smt_priority(struct task_struct *p, int cpu)
+{
+	if (!sched_smt_asym_active() || !sched_feat(SMT_ASYM_PACKING) ||
+	    !is_core_idle(cpu))
+		return cpu;
+
+	return __select_idle_core_cpu(cpu, p->cpus_ptr);
+}
+
+/*
  * Scans the local SMT mask to see if the entire core is idle, and records this
  * information in sd_llc_shared->has_idle_cores.
  *
@@ -7494,7 +7554,7 @@ static int select_idle_core(struct task_struct *p, int core, struct cpumask *cpu
 	}
 
 	if (idle)
-		return core;
+		return select_idle_core_cpu(core, cpus);
 
 	cpumask_andnot(cpus, cpus, cpu_smt_mask(core));
 	return -1;
@@ -7640,6 +7700,7 @@ static int
 select_idle_capacity(struct task_struct *p, struct sched_domain *sd, int target)
 {
 	bool prefers_idle_core = sched_smt_active() && test_idle_cores(target);
+	bool best_idle_core = false;
 	unsigned long task_util, util_min, util_max, best_cap = 0;
 	int fits, best_fits = ASYM_IDLE_COMPLETE_MISFIT;
 	int cpu, best_cpu = -1;
@@ -7666,6 +7727,7 @@ select_idle_capacity(struct task_struct *p, struct sched_domain *sd, int target)
 
 	for_each_cpu_wrap(cpu, cpus, target) {
 		bool preferred_core = !prefers_idle_core || is_core_idle(cpu);
+		bool idle_core = prefers_idle_core && preferred_core;
 		unsigned long cpu_cap = capacity_of(cpu);
 
 		/*
@@ -7682,7 +7744,7 @@ select_idle_capacity(struct task_struct *p, struct sched_domain *sd, int target)
 
 		/* This CPU fits with all requirements */
 		if (fits > 0 && preferred_core)
-			return cpu;
+			return idle_core ? select_idle_core_cpu(cpu, cpus) : cpu;
 		/*
 		 * Only the min performance hint (i.e. uclamp_min) doesn't fit.
 		 * Look for the CPU with best capacity.
@@ -7723,6 +7785,7 @@ select_idle_capacity(struct task_struct *p, struct sched_domain *sd, int target)
 			best_cap = cpu_cap;
 			best_cpu = cpu;
 			best_fits = fits;
+			best_idle_core = idle_core;
 		}
 	}
 
@@ -7738,6 +7801,8 @@ select_idle_capacity(struct task_struct *p, struct sched_domain *sd, int target)
 	 */
 	if (prefers_idle_core && best_fits > ASYM_IDLE_CORE_BIAS)
 		set_idle_cores(target, false);
+	else if (best_idle_core)
+		best_cpu = select_idle_core_cpu(best_cpu, cpus);
 
 	return best_cpu;
 }
@@ -7790,7 +7855,7 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
 
 	if ((available_idle_cpu(target) || sched_idle_cpu(target)) &&
 	    asym_fits_cpu(task_util, util_min, util_max, target))
-		return target;
+		return select_idle_smt_priority(p, target);
 
 	/*
 	 * If the previous CPU is cache affine and idle, don't be stupid:
@@ -7801,9 +7866,9 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
 
 		if (!static_branch_unlikely(&sched_cluster_active) ||
 		    cpus_share_resources(prev, target))
-			return prev;
+			return select_idle_smt_priority(p, prev);
 
-		prev_aff = prev;
+		prev_aff = select_idle_smt_priority(p, prev);
 	}
 
 	/*
@@ -7834,7 +7899,7 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
 
 		if (!static_branch_unlikely(&sched_cluster_active) ||
 		    cpus_share_resources(recent_used_cpu, target))
-			return recent_used_cpu;
+			return select_idle_smt_priority(p, recent_used_cpu);
 
 	} else {
 		recent_used_cpu = -1;
@@ -10162,6 +10227,16 @@ group_type group_classify(unsigned int imbalance_pct,
 static bool sched_use_asym_prio(struct sched_domain *sd, int cpu)
 {
 	if (!(sd->flags & SD_ASYM_PACKING))
+		return false;
+
+	/*
+	 * SMT_ASYM_PACKING controls both idle selection and the pre-existing
+	 * asymmetric-packing load balancing between SMT siblings.  Otherwise,
+	 * disabling the feature can still move tasks to the preferred sibling
+	 * after wakeup.
+	 */
+	if ((sd->flags & SD_SHARE_CPUCAPACITY) &&
+	    !sched_feat(SMT_ASYM_PACKING))
 		return false;
 
 	if (!sched_smt_active())

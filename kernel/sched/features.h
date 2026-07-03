@@ -88,6 +88,12 @@ SCHED_FEAT(TTWU_QUEUE, true)
 SCHED_FEAT(SIS_UTIL, true)
 
 /*
+ * Prefer higher-priority siblings during idle selection and load balancing
+ * on asymmetric SMT cores.
+ */
+SCHED_FEAT(SMT_ASYM_PACKING, true)
+
+/*
  * Issue a WARN when we do multiple update_rq_clock() calls
  * in a single rq->lock section. Default disabled because the
  * annotations are not complete.
