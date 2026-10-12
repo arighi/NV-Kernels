@@ -682,8 +682,9 @@ struct cfs_rq {
 
 	s64			avg_vruntime;
 	u64			avg_load;
-
 	u64			zero_vruntime;
+	unsigned int		sum_shift;
+
 #ifdef CONFIG_SCHED_CORE
 	unsigned int		forceidle_seq;
 	u64			zero_vruntime_fi;
