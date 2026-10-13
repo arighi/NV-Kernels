@@ -1,3 +1,19 @@
+linux-nvidia-6.17 (6.17.0-2032.32+nvbug6915935) noble; urgency=medium
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] update variants
+
+  * Miscellaneous upstream changes
+    - sched/eevdf: Update se->vprot in reweight_entity()
+    - sched/fair: Fix lag clamp
+    - sched/fair: Fix zero_vruntime tracking
+    - sched/debug: Fix avg_vruntime() usage
+    - sched/fair: Increase weight bits for avg_vruntime
+    - sched/fair: Revert 6d71a9c61604 ("sched/fair: Fix EEVDF entity placement
+      bug causing scheduling lag")
+
+ -- Andrea Righi <arighi@nvidia.com>  Tue, 13 Oct 2026 10:40:06 +0200
+
 linux-nvidia-6.17 (6.17.0-1032.32) noble; urgency=medium
 
   * noble/linux-nvidia-6.17: 6.17.0-1032.32 -proposed tracker (LP: #2164554)
